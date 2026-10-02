@@ -5,6 +5,8 @@ Rules (based on published research, parameters fixed up front, not optimised):
   (Moskowitz, Ooi & Pedersen 2012, "Time Series Momentum").
 - Trend filter: only hold an asset while it trades above its 200-day SMA
   (Faber 2007, "A Quantitative Approach to Tactical Asset Allocation").
+- Short side: the same rules mirrored. An asset whose momentum is negative and
+  which trades below its 200-day SMA is sold short (smaller size cap).
 - Inverse-volatility sizing so a calm bond ETF and a volatile equity ETF
   contribute similar risk.
 """
@@ -30,12 +32,22 @@ def target_weights(closes: pd.DataFrame, cfg: StrategyConfig = None) -> pd.DataF
     vol = (closes.pct_change(fill_method=None).rolling(cfg.vol_window).std()
            * np.sqrt(TRADING_DAYS))
 
-    in_trend = (score > 0) & (closes > sma)
-    raw = (cfg.target_vol_per_asset / vol).clip(upper=cfg.max_weight)
+    raw = cfg.target_vol_per_asset / vol
     # Conviction: full size when all lookbacks agree, smaller when mixed.
-    weights = (raw * score.clip(lower=0)).where(in_trend, 0.0).fillna(0.0)
+    up = (score > 0) & (closes > sma)
+    longs = (raw.clip(upper=cfg.max_weight) * score).where(up, 0.0).fillna(0.0)
 
-    gross = weights.sum(axis=1)
+    if cfg.allow_shorts:
+        down = (score < 0) & (closes < sma)
+        shorts = (raw.clip(upper=cfg.max_short_weight) * score).where(down, 0.0).fillna(0.0)
+        short_gross = -shorts.sum(axis=1)
+        cap = (cfg.max_short_gross / short_gross).where(short_gross > cfg.max_short_gross, 1.0)
+        shorts = shorts.mul(cap, axis=0)
+    else:
+        shorts = longs * 0.0
+
+    weights = longs + shorts
+    gross = weights.abs().sum(axis=1)
     scale = (cfg.max_gross / gross).where(gross > cfg.max_gross, 1.0)
     return weights.mul(scale, axis=0)
 

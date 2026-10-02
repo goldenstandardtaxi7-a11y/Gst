@@ -43,9 +43,13 @@ def run_backtest(closes: pd.DataFrame, strategy: StrategyConfig = None,
     pending = None
     for i, day in enumerate(closes.index):
         # Mark to market with the positions held overnight.
-        day_ret = float((held * rets.loc[day]).sum())
+        borrow = float(held.clip(upper=0).abs().sum()) * risk.short_borrow_fee / TRADING_DAYS
+        day_ret = float((held * rets.loc[day]).sum()) - borrow
         equity *= 1 + day_ret
-        if equity > 0:
+        if equity <= 0:
+            equity = 0.0
+            held = held * 0.0
+        else:
             held = held * (1 + rets.loc[day]) / (1 + day_ret)
 
         turnover = 0.0

@@ -24,7 +24,7 @@ def print_stats(name, stats):
 
 
 def cmd_backtest(args):
-    cfg = StrategyConfig()
+    cfg = StrategyConfig(allow_shorts=not args.no_shorts)
     if args.synthetic:
         closes = synthetic_closes(cfg.universe)
         print("WARNING: synthetic random data - shows the mechanics only, says nothing about real performance.")
@@ -35,7 +35,7 @@ def cmd_backtest(args):
         closes = AlpacaBroker(broker_config_from_env()).daily_closes(cfg.universe, args.start)
     cfg.universe = list(closes.columns)
     result = run_backtest(closes, cfg, cost_bps=args.cost_bps)
-    print_stats("Strategy", result.stats)
+    print_stats("Strategy" + (" (long only)" if args.no_shorts else " (long + short)"), result.stats)
     print(f"  {'avg turnover':<14} {result.turnover.sum() / result.stats['years']:.2f}x / year")
     bench = "SPY" if "SPY" in closes else closes.columns[0]
     print_stats(f"Buy & hold {bench}", compute_stats(buy_and_hold(closes[bench])))
@@ -66,6 +66,7 @@ def main():
     bt.add_argument("--synthetic", action="store_true", help="use random demo data")
     bt.add_argument("--csv-dir", help="folder with SYMBOL.csv files")
     bt.add_argument("--start", default="2016-01-01", help="start date when downloading from Alpaca")
+    bt.add_argument("--no-shorts", action="store_true", help="long-only, for comparison")
     bt.add_argument("--cost-bps", type=float, default=10.0, help="cost per trade in basis points")
     bt.set_defaults(func=cmd_backtest)
     tr = sub.add_parser("trade", help="run one trading cycle")

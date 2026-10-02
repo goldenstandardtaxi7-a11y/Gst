@@ -29,13 +29,23 @@ class AlpacaBroker:
         return self._trading("GET", "/v2/clock")
 
     def positions(self):
-        """{symbol: market_value} for open positions."""
+        """{symbol: market_value} for open positions; shorts are negative."""
         return {p["symbol"]: float(p["market_value"]) for p in self._trading("GET", "/v2/positions")}
 
     def submit_notional_order(self, symbol, side, notional):
         return self._trading("POST", "/v2/orders", json={
             "symbol": symbol, "side": side, "type": "market", "time_in_force": "day",
             "notional": f"{notional:.2f}"})
+
+    def submit_qty_order(self, symbol, side, qty):
+        """Whole-share order; Alpaca does not allow fractional or notional short sales."""
+        return self._trading("POST", "/v2/orders", json={
+            "symbol": symbol, "side": side, "type": "market", "time_in_force": "day",
+            "qty": str(int(qty))})
+
+    def can_short(self, symbol):
+        asset = self._trading("GET", f"/v2/assets/{symbol}")
+        return bool(asset.get("shortable") and asset.get("easy_to_borrow"))
 
     def close_position(self, symbol):
         return self._trading("DELETE", f"/v2/positions/{symbol}")

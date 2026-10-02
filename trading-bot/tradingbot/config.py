@@ -15,7 +15,10 @@ class StrategyConfig:
     vol_window: int = 60
     target_vol_per_asset: float = 0.10     # annualised volatility budget per position
     max_weight: float = 0.20               # never more than 20% of equity in one ETF
-    max_gross: float = 1.0                 # no leverage
+    max_gross: float = 1.0                 # long + |short| <= 100% of equity: no leverage
+    allow_shorts: bool = True
+    max_short_weight: float = 0.10         # shorts can lose without limit, so keep them smaller
+    max_short_gross: float = 0.50          # total short exposure cap
 
 
 @dataclass
@@ -24,6 +27,7 @@ class RiskConfig:
     min_trade_weight: float = 0.02    # ignore rebalances smaller than 2% of equity
     max_order_fraction: float = 0.25  # no single order larger than 25% of equity
     cash_buffer: float = 0.02         # keep 2% cash for slippage/fees
+    short_borrow_fee: float = 0.005   # annual cost of borrowing shares to short (backtest)
 
 
 @dataclass
